@@ -1,0 +1,39 @@
+from alpyro.msgs.std_msgs import String, Header
+from alpyro.msgs.sensor_msgs import ChannelFloat32, Temperature
+from pytest import approx
+
+
+def test_simple_string():
+    s1 = String()
+    s1.value = "FooBar"
+    s_bytes = s1.encode()
+
+    s2 = String()
+    s2.decode(s_bytes)
+
+    assert s1.value == s2.value
+
+
+def test_list():
+    v1 = ChannelFloat32()
+    v1.name = "Name"
+    v1.values = [1.1, 1.2, 1.3]
+
+    v2 = ChannelFloat32()
+    v2.decode(v1.encode())
+
+    assert v1.name == v2.name
+    assert v1.values == approx(v2.values)
+
+def test_nested():
+    t1 = Temperature()
+    t1.header.frame_id = "foo"
+    t1.header.seq = 42
+    t1.temperature = 100.1
+
+    t2 = Temperature()
+    t2.decode(t1.encode())
+
+    assert t1.temperature == approx(t2.temperature)
+    assert t1.header.frame_id == t2.header.frame_id
+    assert t1.header.seq == t2.header.seq
