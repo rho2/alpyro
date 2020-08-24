@@ -1,7 +1,6 @@
 from alpyro.msgs.std_msgs import String, Header
-from alpyro.msgs.sensor_msgs import ChannelFloat32, Temperature
+from alpyro.msgs.sensor_msgs import ChannelFloat32, Temperature, JoyFeedback
 from pytest import approx
-
 
 def test_simple_string():
     s1 = String()
@@ -37,3 +36,14 @@ def test_nested():
     assert t1.temperature == approx(t2.temperature)
     assert t1.header.frame_id == t2.header.frame_id
     assert t1.header.seq == t2.header.seq
+
+def test_constants():
+    j = JoyFeedback()
+    j.id = 1
+    j.type = JoyFeedback.TYPE_LED
+
+    j2 = JoyFeedback()
+    j2.decode(j.encode())
+
+    assert j.id == j2.id
+    assert j2.type == JoyFeedback.TYPE_LED

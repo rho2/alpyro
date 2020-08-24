@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, Final
 from typing_extensions import Annotated, get_type_hints
 from typing_extensions import get_args, get_origin  # type: ignore[attr-defined]
 import struct
@@ -82,7 +82,10 @@ class RosMessage:
             buffer = bytearray()
 
         for name, t in get_type_hints(self, include_extras=True).items():  # type: ignore
-            def_factory = list if get_origin(t) == list else t
+            origin = get_origin(t)
+            if origin is Final:
+                continue
+            def_factory = list if origin == list else t
             val = getattr(self, name, def_factory())
             self._encode_value(val, t, buffer)
             # TODO: add missing types: duration, fixed sized array?
@@ -132,6 +135,8 @@ class RosMessage:
 
     def decode(self, buffer: bytearray, offset: int = 0) -> int:
         for name, t in get_type_hints(self, include_extras=True).items():  # type: ignore
+            if get_origin(t) is Final:
+                continue
             val, offset = self._decode_value(buffer, offset, t)
             setattr(self, name, val)
         return offset
