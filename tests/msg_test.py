@@ -1,66 +1,71 @@
 from alpyro.msgs.std_msgs import String, Header
 from alpyro.msgs.sensor_msgs import ChannelFloat32, Temperature, JoyFeedback
 from alpyro.msgs.shape_msgs import MeshTriangle
-from pytest import approx, raises
+from pytest import approx, raises, fixture
+from alpyro.tcp import TCPROSConverter
+from alpyro.msg import Converter
 
-def test_simple_string():
+@fixture
+def tcp_converter():
+    return TCPROSConverter()
+
+def test_simple_string(tcp_converter):
     s1 = String()
     s1.value = "FooBar"
-    s_bytes = s1.encode()
 
     s2 = String()
-    s2.decode(s_bytes)
+    tcp_converter.decode(s2, tcp_converter.encode(s1))
 
     assert s1.value == s2.value
 
 
-def test_list():
+def test_list(tcp_converter):
     v1 = ChannelFloat32()
     v1.name = "Name"
     v1.values = [1.1, 1.2, 1.3]
 
     v2 = ChannelFloat32()
-    v2.decode(v1.encode())
+    tcp_converter.decode(v2, tcp_converter.encode(v1))
 
     assert v1.name == v2.name
     assert v1.values == approx(v2.values)
 
-def test_nested():
+def test_nested(tcp_converter):
     t1 = Temperature()
     t1.header.frame_id = "foo"
     t1.header.seq = 42
     t1.temperature = 100.1
 
     t2 = Temperature()
-    t2.decode(t1.encode())
+    tcp_converter.decode(t2, tcp_converter.encode(t1))
 
     assert t1.temperature == approx(t2.temperature)
     assert t1.header.frame_id == t2.header.frame_id
     assert t1.header.seq == t2.header.seq
 
-def test_constants():
+def test_constants(tcp_converter):
     j = JoyFeedback()
     j.id = 1
     j.type = JoyFeedback.TYPE_LED
 
     j2 = JoyFeedback()
-    j2.decode(j.encode())
+    tcp_converter.decode(j2, tcp_converter.encode(j))
 
     assert j.id == j2.id
     assert j2.type == JoyFeedback.TYPE_LED
 
-def test_fixed_array():
+def test_fixed_array(tcp_converter):
     t = MeshTriangle()
     t.vertex_indices = [1, 2, 3]
 
     t2 = MeshTriangle()
-    t2.decode(t.encode())
+    tcp_converter.decode(t2, tcp_converter.encode(t))
 
     assert t.vertex_indices == t2.vertex_indices
 
-def test_fixed_array_size_mismatch():
+def test_fixed_array_size_mismatch(tcp_converter):
     t = MeshTriangle()
     t.vertex_indices = [1, 2, 3, 4]
 
     with raises(AssertionError):
-        t.encode()
+        tcp_converter.encode(t)
