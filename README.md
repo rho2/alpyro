@@ -1,15 +1,20 @@
 # **AL**ternative **PY**thon **RO**s
 Alternative implementation of a ROS client library in python.
 
+## Installation
+```bash
+pip install alpyro
+```
+
 ## Example usage
 Publisher
 ```python
 from alpyro.node import Node
-from alpyro.msgs.std_msgs import StdString
+from alpyro_msgs.std_msgs.string import StdString
 
 def test():
     msg = StdString()
-    msg.value = "Hello there"
+    msg.data = "Hello there"
 
     return msg
 
@@ -23,10 +28,10 @@ with Node("/pub") as n:
 Subscriber
 ```python
 from alpyro.node import Node
-from alpyro.msgs.std_msgs import StdString
+from alpyro_msgs.std_msgs.string import StdString
 
 def callback(msg: StdString):
-    print(msg.value)
+    print(msg.data)
 
 with Node("/sub") as n:
     n.subscribe("/test", callback)
