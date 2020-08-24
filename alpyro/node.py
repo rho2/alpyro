@@ -1,6 +1,6 @@
 from asyncio.tasks import Task
 from typing import Any, Callable, Dict, List, NoReturn, Tuple, Type, get_type_hints
-from alpyro.msg import RosMessage
+from alpyro_msgs import RosMessage
 from dataclasses import dataclass
 
 from asyncio import BaseProtocol, BaseTransport, get_event_loop, sleep

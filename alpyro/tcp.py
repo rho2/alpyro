@@ -1,7 +1,7 @@
 from asyncio import Protocol
 import struct
 from typing import Dict, Optional, Type, Final, Any
-from alpyro.msg import Duration, RosMessage, Time, Converter
+from alpyro_msgs import  Duration, RosMessage, Time, Converter
 from typing_extensions import Annotated, get_type_hints
 from typing_extensions import get_args, get_origin  # type: ignore[attr-defined]
 

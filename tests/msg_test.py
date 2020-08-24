@@ -1,9 +1,11 @@
-from alpyro.msgs.std_msgs import String, Header
-from alpyro.msgs.sensor_msgs import ChannelFloat32, Temperature, JoyFeedback
-from alpyro.msgs.shape_msgs import MeshTriangle
+from alpyro_msgs.std_msgs.header import Header
+from alpyro_msgs.std_msgs.string import String
+from alpyro_msgs.sensor_msgs.channelfloat32 import ChannelFloat32
+from alpyro_msgs.sensor_msgs.temperature import  Temperature
+from alpyro_msgs.sensor_msgs.joyfeedback import JoyFeedback
+from alpyro_msgs.shape_msgs.meshtriangle import MeshTriangle
 from pytest import approx, raises, fixture
 from alpyro.tcp import TCPROSConverter
-from alpyro.msg import Converter
 
 @fixture
 def tcp_converter():
@@ -11,12 +13,12 @@ def tcp_converter():
 
 def test_simple_string(tcp_converter):
     s1 = String()
-    s1.value = "FooBar"
+    s1.data = "FooBar"
 
     s2 = String()
     tcp_converter.decode(s2, tcp_converter.encode(s1))
 
-    assert s1.value == s2.value
+    assert s1.data == s2.data
 
 
 def test_list(tcp_converter):
@@ -32,6 +34,7 @@ def test_list(tcp_converter):
 
 def test_nested(tcp_converter):
     t1 = Temperature()
+    t1.header = Header()
     t1.header.frame_id = "foo"
     t1.header.seq = 42
     t1.temperature = 100.1
