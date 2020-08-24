@@ -1,4 +1,6 @@
 from typing import Final, List
+
+from typing_extensions import Annotated
 from alpyro.msg import RosMessage, float32, float64, string, uint32, uint8, int8
 import alpyro.msgs.std_msgs as std_msgs
 from alpyro.msgs.std_msgs import Header
@@ -16,7 +18,7 @@ class Image(RosMessage):
     encoding: string
     is_bigendian: uint8
     step: uint32
-    data: List[uint8]
+    data: Annotated[List[uint8], 0, 0]
 
 
 class ChannelFloat32(RosMessage):
@@ -25,7 +27,7 @@ class ChannelFloat32(RosMessage):
     __msg_typ__ = "sensor_msgs/ChannelFloat32"
 
     name: string
-    values: List[float32]
+    values: Annotated[List[float32], 0, 0]
 
 class Temperature(RosMessage):
     __msg_def__= "c3RkX21zZ3MvSGVhZGVyIGhlYWRlcgogIHVpbnQzMiBzZXEKICB0aW1lIHN0YW1wCiAgc3RyaW5nIGZyYW1lX2lkCmZsb2F0NjQgdGVtcGVyYXR1cmUKZmxvYXQ2NCB2YXJpYW5jZQoK"

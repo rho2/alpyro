@@ -53,16 +53,6 @@ class RosMessage:
 
         o = get_origin(typ)
 
-        if o == list:
-            typ, *_ = get_args(typ)
-
-            byte_length = len(val)
-            buffer.extend(byte_length.to_bytes(4, "little", signed=False))
-
-            for v in val:
-                self._encode_value(v, typ, buffer)
-
-            return
         assert o == Annotated
         base, size, signed = get_args(typ)
 
@@ -76,6 +66,16 @@ class RosMessage:
         elif base == Time:
             buffer.extend(val.secs.to_bytes(4, "little", signed=False))
             buffer.extend(val.nsecs.to_bytes(4, "little", signed=False))
+        elif get_origin(base) == list:
+            typ, *_ = get_args(base)
+
+            if size == 0:
+                byte_length = len(val)
+                buffer.extend(byte_length.to_bytes(4, "little", signed=False))
+            else:
+                assert len(val) == size
+            for v in val:
+                self._encode_value(v, typ, buffer)
 
     def encode(self, buffer: Optional[bytearray] = None) -> bytearray:
         if buffer is None:
@@ -83,12 +83,17 @@ class RosMessage:
 
         for name, t in get_type_hints(self, include_extras=True).items():  # type: ignore
             origin = get_origin(t)
+
             if origin is Final:
                 continue
-            def_factory = list if origin == list else t
+
+            def_factory = t
+            if origin is Annotated and get_origin(get_args(t)[0]) is list:
+                def_factory = list
+
             val = getattr(self, name, def_factory())
             self._encode_value(val, t, buffer)
-            # TODO: add missing types: duration, fixed sized array?
+            # TODO: add missing types: duration
         return buffer
 
     def _decode_value(self, buffer: bytearray, offset, typ):
@@ -98,18 +103,6 @@ class RosMessage:
         if o is None and issubclass(typ, RosMessage):
             val = typ()
             offset = val.decode(buffer, offset)
-            return val, offset
-
-        if o == list:
-            t, *_ = get_args(typ)
-
-            l = int.from_bytes(buffer[offset : offset + 4], "little", signed=False)
-            offset += 4
-
-            val = []
-            for _ in range(l):
-                v, offset = self._decode_value(buffer, offset, t)
-                val.append(v)
             return val, offset
 
         base, size, signed = get_args(typ)
@@ -129,6 +122,16 @@ class RosMessage:
             nsecs = int.from_bytes(buffer[offset + 4 : offset + 8], "little", signed=False)
             val = Time(secs, nsecs)
             offset += 8
+        elif get_origin(base) == list:
+            t, *_ = get_args(base)
+            if size == 0:
+                size = int.from_bytes(buffer[offset : offset + 4], "little", signed=False)
+                offset += 4
+
+            val = []
+            for _ in range(size):
+                v, offset = self._decode_value(buffer, offset, t)
+                val.append(v)
         # TODO implement other types
 
         return val, offset

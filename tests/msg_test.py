@@ -1,6 +1,7 @@
 from alpyro.msgs.std_msgs import String, Header
 from alpyro.msgs.sensor_msgs import ChannelFloat32, Temperature, JoyFeedback
-from pytest import approx
+from alpyro.msgs.shape_msgs import MeshTriangle
+from pytest import approx, raises
 
 def test_simple_string():
     s1 = String()
@@ -47,3 +48,19 @@ def test_constants():
 
     assert j.id == j2.id
     assert j2.type == JoyFeedback.TYPE_LED
+
+def test_fixed_array():
+    t = MeshTriangle()
+    t.vertex_indices = [1, 2, 3]
+
+    t2 = MeshTriangle()
+    t2.decode(t.encode())
+
+    assert t.vertex_indices == t2.vertex_indices
+
+def test_fixed_array_size_mismatch():
+    t = MeshTriangle()
+    t.vertex_indices = [1, 2, 3, 4]
+
+    with raises(AssertionError):
+        t.encode()
