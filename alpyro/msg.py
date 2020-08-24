@@ -34,9 +34,19 @@ class Time:
     def __repr__(self) -> str:
         return f"{self.secs}:{self.nsecs}"
 
+class Duration:
+    secs: uint32
+    nsecs: uint32
+
+    def __init__(self, secs: uint32 = 0, nsecs: uint32= 0) -> None:
+        self.secs = secs
+        self.nsecs = nsecs
+
+    def __repr__(self) -> str:
+        return f"{self.secs}:{self.nsecs}"
 
 time = Annotated[Time, 8, UNSIGNED]
-
+duration = Annotated[Duration, 8, UNSIGNED]
 
 class RosMessage:
     __msg_typ__: str

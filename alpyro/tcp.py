@@ -1,7 +1,7 @@
 from asyncio import Protocol
 import struct
 from typing import Dict, Optional, Type, Final, Any
-from alpyro.msg import RosMessage, Time, Converter
+from alpyro.msg import Duration, RosMessage, Time, Converter
 from typing_extensions import Annotated, get_type_hints
 from typing_extensions import get_args, get_origin  # type: ignore[attr-defined]
 
@@ -27,10 +27,10 @@ class TCPROSConverter:
         elif base == float:
             val, *_ = struct.unpack("<f" if size == 4 else "<d", buffer[offset : offset + size])
             offset += size
-        elif base == Time:
+        elif base == Time or base == Duration:
             secs = int.from_bytes(buffer[offset : offset + 4], "little", signed=False)
             nsecs = int.from_bytes(buffer[offset + 4 : offset + 8], "little", signed=False)
-            val = Time(secs, nsecs)
+            val = base(secs, nsecs)
             offset += 8
         elif get_origin(base) == list:
             t, *_ = get_args(base)
@@ -42,7 +42,6 @@ class TCPROSConverter:
             for _ in range(size):
                 v, offset = self._decode_value(msg, buffer, offset, t)
                 val.append(v)
-        # TODO implement other types
 
         return val, offset
 
@@ -71,7 +70,7 @@ class TCPROSConverter:
             buffer.extend(val.to_bytes(size, "little", signed=signed))
         elif base == float:
             buffer.extend(struct.pack("<f" if size == 4 else "<d", val))
-        elif base == Time:
+        elif base == Time or base == Duration:
             buffer.extend(val.secs.to_bytes(4, "little", signed=False))
             buffer.extend(val.nsecs.to_bytes(4, "little", signed=False))
         elif get_origin(base) == list:
@@ -101,7 +100,6 @@ class TCPROSConverter:
 
             val = getattr(msg, name, def_factory())
             self._encode_value(val, t, buffer)
-            # TODO: add missing types: duration
         return buffer
 
     def encode_header(self, cls: Type[RosMessage], caller_id: str, topic: str, extra: Optional[Dict[str, str]] = None):
