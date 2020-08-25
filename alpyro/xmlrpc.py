@@ -1,10 +1,11 @@
 from asyncio.events import AbstractEventLoop
 import inspect
-from typing import Any, List, Tuple
-from xml.etree.ElementTree import Element
+from typing import Any, Coroutine, List, Tuple, Protocol, Union
+from xml.etree.ElementTree import Element, XML
 from aiohttp import web
 import xml.etree.ElementTree as ET
 
+XMLRPCValue = Any #TODO FIXME
 
 def parse_args(params: List[Element]):
     args: List[Any] = []

@@ -1,16 +1,16 @@
-from asyncio.tasks import Task
-from typing import Any, Callable, Dict, List, NoReturn, Tuple, Type, get_type_hints
+import asyncio
+from typing import Any, Callable, Dict, List, Tuple, Type, get_type_hints
 from alpyro_msgs import RosMessage
 from dataclasses import dataclass
-
 from asyncio import BaseProtocol, BaseTransport, get_event_loop, sleep
-from alpyro.xmlrpc import XMLRPCServer
+from alpyro.xmlrpc import XMLRPCServer, XMLRPCValue
 from alpyro.tcp import TCPROSClient, TCPROSServer
-
 from xmlrpc.client import ServerProxy
+import os
 
 MASTER = "http://localhost:11311/"
-
+# this should be List[Tuple[str, XMLRPCValue, ...]] but such as construct is not allowed
+_PROTO_INFO = List[Tuple[str, ...]]
 
 def get_callback_type(f: Callable[[Any], None]) -> Type[RosMessage]:
     hints = get_type_hints(f)
@@ -35,15 +35,19 @@ class Subscription:
 
 class Node(XMLRPCServer):
     name: str
-    subs: Dict[str, Dict[str, Subscription]] = {}
-    pubs: Dict[str, Dict[str, TCPROSServer]] = {}
-    pub_typ: Dict[str, Type[RosMessage]] = {}
+    subs: Dict[str, Dict[str, Subscription]]
+    pubs: Dict[str, Dict[str, TCPROSServer]]
+    topic_typ: Dict[str, Type[RosMessage]]
 
-    callbacks: Dict[str, Tuple[Callable[[Any], None], Type[RosMessage]]] = {}
+    callbacks: Dict[str, Callable[[Any], None]]
 
     def __init__(self, name: str) -> None:
         super().__init__(loop=get_event_loop())
         self.name = name
+        self.subs = {}
+        self.pubs = {}
+        self.topic_typ = {}
+        self.callbacks = {}
 
     def __enter__(self):
         self.create_server()
@@ -88,7 +92,8 @@ class Node(XMLRPCServer):
         code, msg, pubs  = self.m.registerSubscriber(self.name, topic, typ.__msg_typ__, self.uri) #type: ignore
         assert code == 1
 
-        self.callbacks[topic] = (callback, typ)
+        self.callbacks[topic] = callback
+        self.topic_typ[topic] = typ
         self.subs[topic] = {}
 
         for p in pubs: #type: ignore
@@ -97,7 +102,7 @@ class Node(XMLRPCServer):
     def announce(self, topic: str, typ: Type[RosMessage]) -> None:
         code, msg, subs = self.m.registerPublisher(self.name, topic, typ.__msg_typ__, self.uri) #type: ignore
         self.pubs[topic] = {}
-        self.pub_typ[topic] = typ
+        self.topic_typ[topic] = typ
 
     def run_forever(self) -> None:
         self.loop.run_forever()
@@ -120,9 +125,34 @@ class Node(XMLRPCServer):
         self.loop.create_task(self.__pub(topic, rate, f))
 
     # XML node API methods
+    # TODO
+    async def getBusState(self, caller_id: str) -> Tuple[int, str, List[XMLRPCValue]]:
+        ...
+    # TODO
+    async def getBusInfo(self, caller_id: str) -> Tuple[int, str, List[XMLRPCValue]]:
+        ...
+    # TODO
+    async def getMasterUri(self, caller_id: str) -> Tuple[int, str, str]:
+        return (1, "OK", MASTER)
+    # TODO
+    async def shutdown(self, caller_id: str, msg: str = "") -> Tuple[int, str, int]:
+        ...
 
-    async def publisherUpdate(self, callerid: str, topic: str, publisher: List[str]) -> None:
-        callback, typ = self.callbacks[topic]
+    async def getPid(self, caller_id: str) -> Tuple[int, str, int]:
+        return (1, "OK", os.getpid())
+
+    async def getSubscriptions(self, caller_id: str) -> Tuple[int, str, List[Tuple[str, str]]]:
+        return 1, "OK", [ (topic, self.topic_typ[topic].__msg_typ__) for topic in self.subs ]
+
+    async def getPublications(self, caller_id: str) -> Tuple[int, str, List[Tuple[str, str]]]:
+        return 1, "OK", [ (topic, self.topic_typ[topic].__msg_typ__) for topic in self.pubs ]
+    # TODO
+    async def paramUpdate(self, caller_id: str, key: str, val: XMLRPCValue) -> Tuple[int, str, int]:
+        ...
+
+    async def publisherUpdate(self, caller_id: str, topic: str, publisher: List[str]) -> Tuple[int, str, int]:
+        callback = self.callbacks[topic]
+        typ = self.topic_typ[topic]
 
         cur_subs = set(self.subs[topic].keys())
 
@@ -136,15 +166,17 @@ class Node(XMLRPCServer):
             del self.subs[topic][dead_pub].protocol
             del self.subs[topic][dead_pub]
 
-    async def requestTopic(self, callerid: str, topic: str, protocols: List[List[str]]) -> Tuple[int, str, List[Any]]:
-        print(f"Node {callerid} wants to get {topic}, creating server for it")
-        ros_server = TCPROSServer(self.pub_typ[topic], self.name, topic, callerid, self.__delete_pub_serv)
+        return (1, "OK", 0)
+
+    async def requestTopic(self, caller_id: str, topic: str, protocols: _PROTO_INFO) -> Tuple[int, str, _PROTO_INFO]:
+        print(f"Node {caller_id} wants to get {topic}, creating server for it")
+        ros_server = TCPROSServer(self.topic_typ[topic], self.name, topic, caller_id, self.__delete_pub_serv)
 
         server = await self.loop.create_server(lambda: ros_server, "127.0.0.1", 0)
         assert server
 
         addr, port = server.sockets[0].getsockname()  # type: ignore
-        self.pubs[topic][callerid] = ros_server
+        self.pubs[topic][caller_id] = ros_server
 
         code = 1
         msg = "TODO FIXME"
