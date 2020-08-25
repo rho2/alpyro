@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Callable, Dict, List, Tuple, Type, get_type_hints
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, get_type_hints
 from alpyro_msgs import RosMessage
 from dataclasses import dataclass
 from asyncio import BaseProtocol, BaseTransport, get_event_loop, sleep
@@ -8,7 +8,6 @@ from alpyro.tcp import TCPROSClient, TCPROSServer
 from xmlrpc.client import ServerProxy
 import os
 
-MASTER = "http://localhost:11311/"
 # this should be List[Tuple[str, XMLRPCValue, ...]] but such as construct is not allowed
 _PROTO_INFO = List[Tuple[str, ...]]
 
@@ -35,13 +34,15 @@ class Subscription:
 
 class Node(XMLRPCServer):
     name: str
+    core: str
+
     subs: Dict[str, Dict[str, Subscription]]
     pubs: Dict[str, Dict[str, TCPROSServer]]
     topic_typ: Dict[str, Type[RosMessage]]
 
     callbacks: Dict[str, Callable[[Any], None]]
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, core: Optional[str] = None) -> None:
         super().__init__(loop=get_event_loop())
         self.name = name
         self.subs = {}
@@ -49,9 +50,11 @@ class Node(XMLRPCServer):
         self.topic_typ = {}
         self.callbacks = {}
 
+        self.core = core if core else os.getenv("ROS_MASTER_URI", "http://localhost:11311/")
+
     def __enter__(self):
         self.create_server()
-        self.m = ServerProxy(MASTER)
+        self.m = ServerProxy(self.core)
         code, *_ = self.m.getSystemState(self.name)
         assert code == 1
         return self
@@ -133,7 +136,7 @@ class Node(XMLRPCServer):
         ...
     # TODO
     async def getMasterUri(self, caller_id: str) -> Tuple[int, str, str]:
-        return (1, "OK", MASTER)
+        return (1, "OK", self.core)
     # TODO
     async def shutdown(self, caller_id: str, msg: str = "") -> Tuple[int, str, int]:
         ...
