@@ -4,6 +4,7 @@ from alpyro_msgs.sensor_msgs.channelfloat32 import ChannelFloat32
 from alpyro_msgs.sensor_msgs.temperature import  Temperature
 from alpyro_msgs.sensor_msgs.joyfeedback import JoyFeedback
 from alpyro_msgs.shape_msgs.meshtriangle import MeshTriangle
+from alpyro_msgs.sensor_msgs.image import Image
 from pytest import approx, raises, fixture
 from alpyro.tcp import TCPROSConverter
 
@@ -72,3 +73,16 @@ def test_fixed_array_size_mismatch(tcp_converter):
 
     with raises(AssertionError):
         tcp_converter.encode(t)
+
+def test_bytes(tcp_converter):
+    i = Image()
+    i.header = Header()
+    i.header.seq = 1
+    i.data = "foo".encode("utf-8")
+
+    i2 = Image()
+    tcp_converter.decode(i2, tcp_converter.encode(i))
+
+    assert i.header.seq == i2.header.seq
+    assert i.data == i2.data
+    assert i2.data.decode("utf-8") == "foo"
