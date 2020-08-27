@@ -175,8 +175,8 @@ class TCPROSServer(Protocol):
         # TODO handle cases where not all date in received here?
         headers = self.converter.decode_header(data[4:])
 
-        assert headers["md5sum"] == self.typ.__md5_sum__
-        assert headers["type"] == self.typ.__msg_typ__
+        assert headers["md5sum"] == "*" or headers["md5sum"] == self.typ.__md5_sum__
+        assert headers["type"] == "*" or headers["type"] == self.typ.__msg_typ__
 
         send_headers = self.converter.encode_header(self.typ, self.name, self.topic, extra ={"latching": "0"})
 
