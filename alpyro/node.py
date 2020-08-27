@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, get_type_hints
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union, get_args, get_origin, get_type_hints
 from alpyro_msgs import RosMessage
 from dataclasses import dataclass
 from asyncio import BaseProtocol, BaseTransport, get_event_loop, sleep
@@ -10,6 +10,14 @@ import os
 
 # this should be List[Tuple[str, XMLRPCValue, ...]] but such as construct is not allowed
 _PROTO_INFO = List[Tuple[str, ...]]
+
+_MSG_FACTORY = Union[
+    Callable[[], RosMessage],
+    Callable[["Node"], RosMessage],
+    Callable[[Optional[RosMessage]],  RosMessage],
+    Callable[[Optional[RosMessage], "Node"],  RosMessage],
+    Callable[["Node", Optional[RosMessage]],  RosMessage],
+]
 
 def get_callback_type(f: Callable[[Any], None]) -> Type[RosMessage]:
     hints = get_type_hints(f)
@@ -114,17 +122,41 @@ class Node(XMLRPCServer):
         if callerid in self.pubs[topic]:  # avoid double free
             del self.pubs[topic][callerid]
 
-    async def __pub(self, topic: str, rate: int, f: Callable[[], RosMessage]) -> None:
+    async def __pub(self, topic: str, rate: int, f: _MSG_FACTORY) -> None:
         # TODO cancel this coro when no subscriber are there and restart it again later
+        msg = None
+
+        depends = get_type_hints(f)
+        del depends["return"]
+
+        include_msg = ""
+        include_self = ""
+        for name, typ in depends.items():
+            if get_origin(typ) == Union:
+                ros_typ, none = get_args(typ)
+                assert issubclass(ros_typ, RosMessage)
+                assert none == type(None)
+                include_msg = name
+            elif typ == Node:
+                include_self = name
+            else:
+                raise Exception(f"Typ {typ} cant be inserted")
+
         while self.loop.is_running():
-            msg = f()
+            args: Dict[str, Any] = {}
+            if include_msg:
+                args[include_msg]  = msg
+            if include_self:
+                args[include_self] = self
+
+            msg = f(**args) #type: ignore
 
             for ps in self.pubs[topic].values():
                 ps.publish(msg)
 
             await sleep(1.0 / rate)
 
-    def schedule_publish(self, topic: str, rate: int, f: Callable[[], RosMessage]):
+    def schedule_publish(self, topic: str, rate: int, f:_MSG_FACTORY):
         self.loop.create_task(self.__pub(topic, rate, f))
 
     # XML node API methods

@@ -10,16 +10,16 @@ pip install alpyro
 Publisher
 ```python
 from alpyro.node import Node
-from alpyro_msgs.std_msgs.string import StdString
+from alpyro_msgs.std_msgs.string import String
 
 def test():
-    msg = StdString()
+    msg = String()
     msg.data = "Hello there"
 
     return msg
 
 with Node("/pub") as n:
-    n.announce("/test", StdString)
+    n.announce("/test", String)
     n.schedule_publish("/test", 10, test)
 
     n.run_forever()
@@ -28,13 +28,34 @@ with Node("/pub") as n:
 Subscriber
 ```python
 from alpyro.node import Node
-from alpyro_msgs.std_msgs.string import StdString
+from alpyro_msgs.std_msgs.string import String
 
-def callback(msg: StdString):
+def callback(msg: String):
     print(msg.data)
 
 with Node("/sub") as n:
     n.subscribe("/test", callback)
+
+    n.run_forever()
+```
+
+Get the node or the last message in the message factory:
+```python
+from alpyro.node import Node
+from alpyro_msgs.std_msgs.string import String
+
+def test(node: Node, msg: Optional[String]):
+    if msg is None:
+        msg = String()
+        msg.data = f"Hello from {node.name}"
+
+    msg.data += "."
+
+    return msg
+
+with Node("/pub") as n:
+    n.announce("/test", String)
+    n.schedule_publish("/test", 10, test)
 
     n.run_forever()
 ```
