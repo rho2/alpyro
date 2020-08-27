@@ -19,17 +19,33 @@ _MSG_FACTORY = Union[
     Callable[["Node", Optional[RosMessage]],  RosMessage],
 ]
 
-def get_callback_type(f: Callable[[Any], None]) -> Type[RosMessage]:
+_CALLBACK_TYPE = Union[
+    Callable[[RosMessage], None],
+    Callable[[RosMessage, "Node"], None],
+    Callable[["Node", RosMessage], None]
+]
+
+def get_callback_type(f: _CALLBACK_TYPE) -> Tuple[Type[RosMessage], str, str]:
     hints = get_type_hints(f)
-    it = iter(hints.items())
 
-    _, typ = next(it)
-    assert issubclass(typ, RosMessage)
+    msg_typ = None
+    msg_name = ""
+    node_name = ""
+    for name, typ in hints.items():
+        if issubclass(typ, RosMessage):
+            msg_typ = typ
+            msg_name = name
+        elif typ == Node:
+            node_name = name
+        elif name == "return":
+            continue
+        else:
+            raise Exception(f"Cant insert type {typ} into a callback")
 
-    arg, _ = next(it, ("return", ""))
-    assert arg == "return"
+    assert msg_typ is not None
 
-    return typ
+    return msg_typ, msg_name, node_name
+
 
 
 @dataclass
@@ -48,7 +64,7 @@ class Node(XMLRPCServer):
     pubs: Dict[str, Dict[str, TCPROSServer]]
     topic_typ: Dict[str, Type[RosMessage]]
 
-    callbacks: Dict[str, Callable[[Any], None]]
+    callbacks: Dict[str,Tuple[_CALLBACK_TYPE, str, str]]
 
     def __init__(self, name: str, core: Optional[str] = None) -> None:
         super().__init__(loop=get_event_loop())
@@ -82,7 +98,7 @@ class Node(XMLRPCServer):
         self.loop_server.close()
         self.loop.stop()
 
-    async def __subscribe__(self, pub: str, topic: str, typ: Type[RosMessage], callback: Callable[[Any], None]) -> None:
+    async def __subscribe__(self, pub: str, topic: str, typ: Type[RosMessage]) -> None:
         if topic in self.subs and pub in self.subs[topic]:
             return
 
@@ -91,24 +107,26 @@ class Node(XMLRPCServer):
         code, status, params = ServerProxy(pub).requestTopic(self.name, topic, [["TCPROS"]])  # type: ignore
         prot, hostname, port = params  # type: ignore
 
+        callback, arg_name_msg, arg_name_node = self.callbacks[topic]
+
         transport, protocol = await self.loop.create_connection(
-            lambda: TCPROSClient(callback, typ, self.name, topic), hostname, port
+            lambda: TCPROSClient(callback, typ, self.name, topic, arg_name_msg, arg_name_node, self), hostname, port
         )
 
         self.subs[topic][pub] = Subscription(topic, pub, transport, protocol)
 
-    def subscribe(self, topic: str, callback: Callable[[Any], None]) -> None:
-        typ = get_callback_type(callback)
+    def subscribe(self, topic: str, callback:_CALLBACK_TYPE) -> None:
+        typ, msg_name, node_name = get_callback_type(callback)
 
         code, msg, pubs  = self.m.registerSubscriber(self.name, topic, typ.__msg_typ__, self.uri) #type: ignore
         assert code == 1
 
-        self.callbacks[topic] = callback
+        self.callbacks[topic] = (callback, msg_name, node_name)
         self.topic_typ[topic] = typ
         self.subs[topic] = {}
 
         for p in pubs: #type: ignore
-            self.loop.create_task(self.__subscribe__(p, topic, typ, callback))
+            self.loop.create_task(self.__subscribe__(p, topic, typ))
 
     def announce(self, topic: str, typ: Type[RosMessage]) -> None:
         code, msg, subs = self.m.registerPublisher(self.name, topic, typ.__msg_typ__, self.uri) #type: ignore
@@ -186,13 +204,12 @@ class Node(XMLRPCServer):
         ...
 
     async def publisherUpdate(self, caller_id: str, topic: str, publisher: List[str]) -> Tuple[int, str, int]:
-        callback = self.callbacks[topic]
         typ = self.topic_typ[topic]
 
         cur_subs = set(self.subs[topic].keys())
 
         for pub in publisher:
-            await self.__subscribe__(pub, topic, typ, callback)
+            await self.__subscribe__(pub, topic, typ)
             if pub in cur_subs:
                 cur_subs.remove(pub)
 

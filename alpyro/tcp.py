@@ -203,7 +203,7 @@ class TCPROSServer(Protocol):
 
 
 class TCPROSClient(Protocol):
-    def __init__(self, callback, typ, name, topic):
+    def __init__(self, callback, typ, name, topic, arg_name_msg, arg_name_node, node):
         self.callback = callback
         self.typ = typ
         self.name = name
@@ -212,6 +212,9 @@ class TCPROSClient(Protocol):
         self.converter = TCPROSConverter()
         self.current_buffer = None
         self.msg_len = 0
+        self.arg_name_msg = arg_name_msg
+        self.arg_name_node = arg_name_node
+        self.node = node
 
     def connection_made(self, transport):
         transport.write(self.converter.encode_header(self.typ, self.name, self.topic))
@@ -219,7 +222,10 @@ class TCPROSClient(Protocol):
     def _msg_finished(self):
         ins = self.typ()
         self.converter.decode(ins, self.current_buffer, 0)
-        self.callback(ins)
+        args = {self.arg_name_msg: ins}
+        if self.arg_name_node:
+            args[self.arg_name_node] = self.node
+        self.callback(**args)
         self.current_buffer = None
 
     def _build_msg(self, data: bytes):

@@ -59,3 +59,17 @@ with Node("/pub") as n:
 
     n.run_forever()
 ```
+
+Get the node in a callback:
+```python
+from alpyro.node import Node
+from alpyro_msgs.std_msgs.string import String
+
+def callback(msg: String, node: Node):
+    print(node.name, msg.data)
+
+with Node("/sub") as n:
+    n.subscribe("/test", callback)
+
+    n.run_forever()
+```
