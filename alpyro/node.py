@@ -140,6 +140,10 @@ class Node(XMLRPCServer):
         if callerid in self.pubs[topic]:  # avoid double free
             del self.pubs[topic][callerid]
 
+    def publish(self, topic: str, msg: RosMessage) -> None:
+        for ps in self.pubs[topic].values():
+            ps.publish(msg)
+
     async def __pub(self, topic: str, rate: int, f: _MSG_FACTORY) -> None:
         # TODO cancel this coro when no subscriber are there and restart it again later
         msg = None
@@ -169,8 +173,7 @@ class Node(XMLRPCServer):
 
             msg = f(**args) #type: ignore
 
-            for ps in self.pubs[topic].values():
-                ps.publish(msg)
+            self.publish(topic, msg)
 
             await sleep(1.0 / rate)
 

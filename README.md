@@ -73,3 +73,17 @@ with Node("/sub") as n:
 
     n.run_forever()
 ```
+
+Simple relay node:
+```python
+from alpyro.node import Node
+from alpyro_msgs.std_msgs.string import String
+
+def callback(node: Node, msg: String):
+    node.publish("/test2", msg)
+
+with Node("/sub") as n:
+    n.announce("/test2", String)
+    n.subscribe("/test", callback)
+    n.run_forever()
+```
