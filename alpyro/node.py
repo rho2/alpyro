@@ -7,6 +7,7 @@ from alpyro.xmlrpc import XMLRPCServer, XMLRPCValue
 from alpyro.tcp import TCPROSClient, TCPROSServer
 from xmlrpc.client import ServerProxy
 import os
+from alpyro.parameter import ParameterApi
 
 # this should be List[Tuple[str, XMLRPCValue, ...]] but such as construct is not allowed
 _PROTO_INFO = List[Tuple[str, ...]]
@@ -65,6 +66,9 @@ class Node(XMLRPCServer):
     topic_typ: Dict[str, Type[RosMessage]]
 
     callbacks: Dict[str,Tuple[_CALLBACK_TYPE, str, str]]
+    param_callbacks: Dict[str, Callable]
+
+    param: ParameterApi
 
     def __init__(self, name: str, core: Optional[str] = None) -> None:
         super().__init__(loop=get_event_loop())
@@ -73,6 +77,8 @@ class Node(XMLRPCServer):
         self.pubs = {}
         self.topic_typ = {}
         self.callbacks = {}
+        self.param_callbacks = {}
+        self.param = ParameterApi(self)
 
         self.core = core if core else os.getenv("ROS_MASTER_URI", "http://localhost:11311/")
 
@@ -207,7 +213,8 @@ class Node(XMLRPCServer):
         return 1, "OK", [ (topic, self.topic_typ[topic].__msg_typ__) for topic in self.pubs ]
     # TODO
     async def paramUpdate(self, caller_id: str, key: str, val: XMLRPCValue) -> Tuple[int, str, int]:
-        ...
+        self.param_callbacks[key](val)
+        return 1, "OK", 0
 
     async def publisherUpdate(self, caller_id: str, topic: str, publisher: List[str]) -> Tuple[int, str, int]:
         typ = self.topic_typ[topic]
