@@ -87,3 +87,8 @@ with Node("/sub") as n:
     n.subscribe("/test", callback)
     n.run_forever()
 ```
+
+Missing stuff:
+- [ ] services
+- [ ] option to use sim_time instead of walltime
+- [ ] parse remapping args
