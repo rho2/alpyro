@@ -98,6 +98,9 @@ class Node(XMLRPCServer):
         self.loop_server.close()
         self.loop.stop()
 
+        print(f"Shutting down node {self.name}")
+        return issubclass(type, KeyboardInterrupt)
+
     async def __subscribe__(self, pub: str, topic: str, typ: Type[RosMessage]) -> None:
         if topic in self.subs and pub in self.subs[topic]:
             return
