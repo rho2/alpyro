@@ -4,6 +4,7 @@ from typing import Any, Coroutine, List, Tuple, Protocol, Union
 from xml.etree.ElementTree import Element, XML
 from aiohttp import web
 import xml.etree.ElementTree as ET
+import socket
 
 XMLRPCValue = Any #TODO FIXME
 
@@ -54,9 +55,13 @@ class XMLRPCServer:
 
     async def start_server(self):
         self.server = web.Server(self.handler)
-        # TODO add option to specify the address to use
-        self.loop_server = await self.loop.create_server(self.server, "127.0.0.1", 0)
-        self.addr = self.loop_server.sockets[0].getsockname()
+
+        host_name = socket.gethostname()
+
+        self.loop_server = await self.loop.create_server(self.server, "0.0.0.0", 0)
+        _, port = self.loop_server.sockets[0].getsockname()
+
+        self.addr = (host_name, port)
         print("Started the XMLRPC endpoint at address:", self.addr)
 
     async def handler(self, request):

@@ -237,11 +237,12 @@ class Node(XMLRPCServer):
         print(f"Node {caller_id} wants to get {topic}, creating server for it")
         ros_server = TCPROSServer(self.topic_typ[topic], self.name, topic, caller_id, self.__delete_pub_serv)
 
-        server = await self.loop.create_server(lambda: ros_server, "127.0.0.1", 0)
+        server = await self.loop.create_server(lambda: ros_server, "0.0.0.0", 0)
         assert server
 
-        addr, port = server.sockets[0].getsockname()  # type: ignore
+        _, port = server.sockets[0].getsockname()  # type: ignore
         self.pubs[topic][caller_id] = ros_server
+        addr, _ = self.addr
 
         code = 1
         msg = "TODO FIXME"
