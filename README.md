@@ -9,34 +9,25 @@ pip install alpyro
 ## Example usage
 Publisher
 ```python
-from alpyro.node import Node
 from alpyro_msgs.std_msgs.string import String
+from alpyro.magic import publish
 
-def test():
-    msg = String()
-    msg.data = "Hello there"
+@publish("/test2", rate=10)
+def write_str() -> String:
+    s = String()
+    s.data = "Hello there!"
+    return s
 
-    return msg
-
-with Node("/pub") as n:
-    n.announce("/test", String)
-    n.schedule_publish("/test", 10, test)
-
-    n.run_forever()
 ```
 
 Subscriber
 ```python
-from alpyro.node import Node
 from alpyro_msgs.std_msgs.string import String
+from alpyro.magic import subscribe
 
+@subscribe("/test")
 def callback(msg: String):
     print(msg.data)
-
-with Node("/sub") as n:
-    n.subscribe("/test", callback)
-
-    n.run_forever()
 ```
 
 Get the node or the last message in the message factory:
@@ -76,16 +67,19 @@ with Node("/sub") as n:
 
 Simple relay node:
 ```python
-from alpyro.node import Node
 from alpyro_msgs.std_msgs.string import String
+from alpyro.magic import subscribe, publish
+from alpyro.node import Node
 
-def callback(node: Node, msg: String):
-    node.publish("/test2", msg)
+@publish("/test2", rate=0)
+def write_str() -> String:
+    s = String()
+    s.data = "Hello there!"
+    return s
 
-with Node("/sub") as n:
-    n.announce("/test2", String)
-    n.subscribe("/test", callback)
-    n.run_forever()
+@subscribe("/chatter")
+def read_str(s: String, n: Node) -> None:
+    n.publish("/test2", s)
 ```
 
 Missing stuff:
